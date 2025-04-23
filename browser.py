@@ -2,13 +2,19 @@ import socket
 import ssl
 
 
+# file:///Users/allanferencz/learnspace/my-browser/example_file.md
 class URL:
     def __init__(self, url):
         self.scheme, url = url.split("://", 1)
-        assert self.scheme in ["http", "https"]
+
+        assert self.scheme in ["http", "https", "file"]
+
+        if url[0] == "/":
+            self.file = url
 
         if "/" not in url:
             url = url + "/"
+            return
         self.host, url = url.split("/", 1)
         self.path = "/" + url
         if self.scheme == "http":
@@ -20,11 +26,25 @@ class URL:
             self.host, port = self.host.split(":", 1)
             self.port = int(port)
 
+    def handle_request(self):
+        match self.scheme:
+            case "http":
+                return self.request()
+            case "https":
+                return self.request()
+            case "file":
+                return self.open_file()
+
+    def open_file(self):
+        with open(self.file) as file:
+            content = file.read()
+        return content
+
     def request(self):
-        def build_headers(dict):
+        def build_headers(d):
             request_headers = "GET {} HTTP/1.0\r\n".format(self.path)
 
-            for key, value in dict.items():
+            for key, value in d.items():
                 request_headers += f"{key}: {value}\r\n"
 
             request_headers += "\r\n"
@@ -79,11 +99,17 @@ def show(body):
 
 
 def load(url):
-    body = url.request()
+    body = url.handle_request()
     show(body)
 
 
 if __name__ == "__main__":
     import sys
 
-    load(URL(sys.argv[1]))
+    argument = (
+        sys.argv[1]
+        if len(sys.argv) > 1
+        else "file:///Users/allanferencz/learnspace/my-browser/example_file.md"
+    )
+
+    load(URL(argument))
