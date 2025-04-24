@@ -106,6 +106,7 @@ class Browser:
         self.window.bind("<Down>", self.scrolldown)
 
     def layout(self, text):
+        print(repr(text))
 
         def linebreak(x, y):
             y += Browser.VSTEP
@@ -114,7 +115,10 @@ class Browser:
 
         display_list = []
         cursor_x, cursor_y = Browser.HSTEP, Browser.VSTEP
-        for c in text:
+        for i, c in enumerate(text):
+            if c == "\n":
+                cursor_x, cursor_y = linebreak(cursor_x, cursor_y)
+                continue
             display_list.append((cursor_x, cursor_y, c))
             cursor_x += Browser.HSTEP
             if cursor_x >= BROWSER_WIDTH - Browser.HSTEP:
