@@ -1,5 +1,6 @@
 import socket
 import ssl
+import tkinter
 
 
 # file:///Users/allanferencz/learnspace/my-browser/example_file.md
@@ -87,7 +88,62 @@ class URL:
         return content
 
 
-def show(body):
+BROWSER_WIDTH = 800
+BROWSER_HEIGHT = 600
+BROWSER_SCROLL_STEP = 100
+
+
+class Browser:
+    HSTEP, VSTEP = 13, 18
+
+    def __init__(self):
+        self.scroll = 0
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(
+            self.window, width=BROWSER_WIDTH, height=BROWSER_HEIGHT
+        )
+        self.canvas.pack()
+        self.window.bind("<Down>", self.scrolldown)
+
+    def layout(self, text):
+
+        def linebreak(x, y):
+            y += Browser.VSTEP
+            x = Browser.HSTEP
+            return (x, y)
+
+        display_list = []
+        cursor_x, cursor_y = Browser.HSTEP, Browser.VSTEP
+        for c in text:
+            display_list.append((cursor_x, cursor_y, c))
+            cursor_x += Browser.HSTEP
+            if cursor_x >= BROWSER_WIDTH - Browser.HSTEP:
+                cursor_x, cursor_y = linebreak(cursor_x, cursor_y)
+        return display_list
+
+    def draw(self):
+        self.canvas.delete("all")
+        for x, y, c in self.display_list:
+            if y > self.scroll + BROWSER_WIDTH:
+                continue
+            if y + Browser.VSTEP < self.scroll:
+                continue
+
+            self.canvas.create_text(x, y - self.scroll, text=c)
+
+    def load(self, url):
+        body = url.handle_request()
+        text = lex(body)
+        self.display_list = self.layout(text)
+        self.draw()
+
+    def scrolldown(self, e):
+        self.scroll += BROWSER_SCROLL_STEP
+        self.draw()
+
+
+def lex(body):
+    text = ""
     in_tag = False
     for c in body:
         if c == "<":
@@ -95,12 +151,8 @@ def show(body):
         elif c == ">":
             in_tag = False
         elif not in_tag:
-            print(c, end="")
-
-
-def load(url):
-    body = url.handle_request()
-    show(body)
+            text += c
+    return text
 
 
 if __name__ == "__main__":
@@ -112,4 +164,5 @@ if __name__ == "__main__":
         else "file:///Users/allanferencz/learnspace/my-browser/example_file.md"
     )
 
-    load(URL(argument))
+    Browser().load(URL(argument))
+    tkinter.mainloop()
