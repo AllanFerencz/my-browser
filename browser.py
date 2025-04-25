@@ -104,6 +104,8 @@ class Browser:
         )
         self.canvas.pack()
         self.window.bind("<Down>", self.scrolldown)
+        self.window.bind("<Up>", self.scrollup)
+        self.window.bind("<MouseWheel>", self.scrollwheel)
 
     def layout(self, text):
         print(repr(text))
@@ -123,6 +125,8 @@ class Browser:
             cursor_x += Browser.HSTEP
             if cursor_x >= BROWSER_WIDTH - Browser.HSTEP:
                 cursor_x, cursor_y = linebreak(cursor_x, cursor_y)
+
+        self.max_height = cursor_y
         return display_list
 
     def draw(self):
@@ -142,8 +146,28 @@ class Browser:
         self.draw()
 
     def scrolldown(self, e):
-        self.scroll += BROWSER_SCROLL_STEP
+        self.scrollbody(BROWSER_SCROLL_STEP)
+
+    def scrollup(self, e):
+        self.scrollbody(-BROWSER_SCROLL_STEP)
+
+    def scrollbody(self, value):
+        newValue = self.scroll + value
+
+        if newValue < 0:
+            self.scroll = 0
+        elif newValue >= self.max_height - BROWSER_HEIGHT:
+            self.scroll = self.max_height - BROWSER_HEIGHT
+        else:
+            self.scroll = newValue
+
         self.draw()
+
+    def scrollwheel(self, e):
+        if e.num == 5 or e.delta == -120:
+            self.scrolldown(e)
+        if e.num == 4 or e.delta == 120:
+            self.scrollup(e)
 
 
 def lex(body):
