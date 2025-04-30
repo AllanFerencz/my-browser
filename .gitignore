@@ -1,0 +1,18 @@
+# dotenv
+.env
+.DS_Store
+*.log
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+tasks_output
+uploads
+
+.python-version
+uv.lock
+pyproject.toml
+mise.toml
+dist/
+node_modules/
+test.db
+
