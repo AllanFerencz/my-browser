@@ -1,92 +1,11 @@
-import socket
-import ssl
 import tkinter
+import tkinter.font
 
+from tag import Tag
+from text import Text
+from url import URL
 
 # file:///Users/allanferencz/learnspace/my-browser/example_file.md
-class URL:
-    def __init__(self, url):
-        self.scheme, url = url.split("://", 1)
-
-        assert self.scheme in ["http", "https", "file"]
-
-        if url[0] == "/":
-            self.file = url
-
-        if "/" not in url:
-            url = url + "/"
-            return
-        self.host, url = url.split("/", 1)
-        self.path = "/" + url
-        if self.scheme == "http":
-            self.port = 80
-        elif self.scheme == "https":
-            self.port = 443
-
-        if ":" in self.host:
-            self.host, port = self.host.split(":", 1)
-            self.port = int(port)
-
-    def handle_request(self):
-        match self.scheme:
-            case "http":
-                return self.request()
-            case "https":
-                return self.request()
-            case "file":
-                return self.open_file()
-
-    def open_file(self):
-        with open(self.file) as file:
-            content = file.read()
-        return content
-
-    def request(self):
-        def build_headers(d):
-            request_headers = "GET {} HTTP/1.0\r\n".format(self.path)
-
-            for key, value in d.items():
-                request_headers += f"{key}: {value}\r\n"
-
-            request_headers += "\r\n"
-            return request_headers
-
-        s = socket.socket(
-            family=socket.AF_INET,
-            type=socket.SOCK_STREAM,
-            proto=socket.IPPROTO_TCP,
-        )
-        s.connect((self.host, self.port))
-        if self.scheme == "https":
-            ctx = ssl.create_default_context()
-            s = ctx.wrap_socket(s, server_hostname=self.host)
-
-        request = build_headers(
-            {"Connection": "close", "Host": self.host, "User-Agent": "AF_BROWSER"}
-        )
-        s.send(request.encode("utf8"))
-
-        response = s.makefile("r", encoding="utf8", newline="\r\n")
-
-        statusline = response.readline()
-        version, status, explanation = statusline.split(" ", 2)
-
-        response_headers = {}
-        while True:
-            line = response.readline()
-            if line == "\r\n":
-                break
-            header, value = line.split(":", 1)
-            response_headers[header.casefold()] = value.strip()
-
-        assert "transfer-encoding" not in response_headers
-        assert "content-encoding" not in response_headers
-
-        content = response.read()
-        s.close()
-
-        return content
-
 
 BROWSER_WIDTH = 800
 BROWSER_HEIGHT = 600
@@ -114,6 +33,13 @@ class Browser:
         self.scrollbar_y = 0
 
     def layout(self, text=""):
+        font = tkinter.font.Font(
+            family="Times",
+            size=16,
+            weight="bold",
+            slant="italic",
+        )
+
         if text == "" and hasattr(self, "text"):
             text = self.text
         else:
@@ -123,7 +49,7 @@ class Browser:
         # print(self.width)
 
         def linebreak(x, y):
-            y += Browser.VSTEP
+            y += font.metrics("linespace") * 1.25
             x = Browser.HSTEP
             return (x, y)
 
@@ -136,14 +62,17 @@ class Browser:
 
         display_list = []
         cursor_x, cursor_y = Browser.HSTEP, Browser.VSTEP
-        for i, c in enumerate(text):
-            if c == "\n":
+        for word in text.split():
+            word_width = font.measure(word)
+            if word == "\n":
                 cursor_x, cursor_y = linebreak(cursor_x, cursor_y)
                 continue
-            display_list.append((cursor_x, cursor_y, c))
-            cursor_x += Browser.HSTEP
-            if cursor_x >= self.content_body_width - Browser.HSTEP:
+
+            if cursor_x + word_width > self.content_body_width - Browser.HSTEP:
                 cursor_x, cursor_y = linebreak(cursor_x, cursor_y)
+
+            display_list.append((cursor_x, cursor_y, word))
+            cursor_x += word_width + font.measure(" ")
 
         self.max_height = cursor_y
         self.scrollbar_height = scrollbar_height(self.max_height, self.height)
@@ -151,13 +80,23 @@ class Browser:
 
     def draw(self):
         self.canvas.delete("all")
+
+        bi_times = tkinter.font.Font(
+            family="Times",
+            size=16,
+            weight="bold",
+            slant="italic",
+        )
+
         for x, y, c in self.display_list:
             if y > self.scroll + self.height:
                 continue
             if y + Browser.VSTEP < self.scroll:
                 continue
 
-            self.canvas.create_text(x, y - self.scroll, text=c)
+            self.canvas.create_text(
+                x, y - self.scroll, text=c, font=bi_times, anchor="nw"
+            )
             self.canvas.create_rectangle(
                 self.content_body_width,
                 0,
@@ -217,16 +156,24 @@ class Browser:
 
 
 def lex(body):
-    text = ""
+    out = []
+    buffer = ""
     in_tag = False
     for c in body:
         if c == "<":
             in_tag = True
+            if buffer:
+                out.append(Text(buffer))
+            buffer = ""
         elif c == ">":
             in_tag = False
-        elif not in_tag:
-            text += c
-    return text
+            out.append(Tag(buffer))
+            buffer = ""
+        else:
+            buffer += c
+    if not in_tag and buffer:
+        out.append(Text(buffer))
+    return out
 
 
 if __name__ == "__main__":
