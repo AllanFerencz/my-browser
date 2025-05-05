@@ -1,12 +1,15 @@
 import math
 import tkinter
 import tkinter.font
+from typing import Literal
 
 from tag_token import TagToken
 from text_token import TextToken
 from url import URL
 
 type Token = TextToken | TagToken
+type Style = Literal['roman', 'italic']
+type Weight = Literal['normal', 'bold']
 
 class Layout:
     HSTEP: int = 13
@@ -16,8 +19,12 @@ class Layout:
         self.width: int = width
         self.height: int = height
         self.tokens = tokens
+        self.weight: Weight = "normal"
+        self.style: Style = 'roman'
 
-        font = tkinter.font.Font(
+        self.cursor_x = Layout.HSTEP
+        self.cursor_y = Layout.VSTEP
+        self.font = tkinter.font.Font(
             family="Times",
             size=16,
             weight="bold",
@@ -25,7 +32,47 @@ class Layout:
         )
         self.render_height = self.height
         self.draw_width = self.width
+        self.tree: list[tuple[int, int, str, tkinter.font.Font]] = []
 
+    def token(self, tok):
+
+        if isinstance(tok, TextToken):
+            for word in tok.text.splitlines(keepends=True):
+                word_width, font = self.word(word)
+
+                if "\n" in word:
+                    self.linebreak()
+                    continue
+
+                if self.cursor_x + word_width > self.width - Layout.HSTEP:
+                    self.linebreak()
+
+                self.tree.append((self.cursor_x, self.cursor_y, word, self.font))
+                self.cursor_x += word_width + font.measure(" ")
+
+        elif tok.tag == "i":
+            self.style = "italic"
+        elif tok.tag == "/i":
+            self.style = "roman"
+        elif tok.tag == "b":
+            self.weight = "bold"
+        elif tok.tag == "/b":
+            self.weight = "normal"
+
+    def linebreak(self):
+        self.cursor_y = self.cursor_y + math.floor(self.font.metrics("linespace") * 1.25)
+        self.cursor_x = Layout.HSTEP
+
+    def word(self, word):
+        font: tkinter.font.Font = tkinter.font.Font(
+                size=16,
+                weight=self.weight,
+                slant=self.style,
+                )
+
+        word_width = font.measure(word)
+        return (word_width, font)
+        
     def compute(self):
         # if tokens == [] and hasattr(self, "tokens"):
         #     tokens = self.tokens
@@ -35,11 +82,6 @@ class Layout:
         # print(repr(text))
         # print(self.width)
 
-        def linebreak(x: int, y: int):
-            return_y: int = y + math.floor(font.metrics("linespace") * 1.25)
-            return_x: int = Layout.HSTEP
-            return (return_x, return_y)
-
         def scrollbar_height(document_height, viewport_height):
             return max(
                 viewport_height
@@ -47,40 +89,10 @@ class Layout:
                 30,
             )
 
-        display_list: list[tuple[int, int, str, tkinter.font.Font]] = []
-        cursor_x, cursor_y = Layout.HSTEP, Layout.VSTEP
-        weight: str = "normal"
-        style: str = "roman"
         for tok in self.tokens:
-            if isinstance(tok, TextToken):
-                for word in tok.text.splitlines(keepends=True):
-                    font: tkinter.font.Font = tkinter.font.Font(
-                        size=16,
-                        weight=weight,
-                        slant=style,
-                    )
-                    word_width = font.measure(word)
-                    if "\n" in word:
-                        cursor_x, cursor_y = linebreak(cursor_x, cursor_y)
-                        continue
+            self.token(tok)
 
-                    if cursor_x + word_width > self.width - Layout.HSTEP:
-                        cursor_x, cursor_y = linebreak(cursor_x, cursor_y)
-
-                    display_list.append((cursor_x, cursor_y, word, font))
-                    cursor_x += word_width + font.measure(" ")
-
-            elif tok.tag == "i":
-                style = "italic"
-            elif tok.tag == "/i":
-                style = "roman"
-            elif tok.tag == "b":
-                weight = "bold"
-            elif tok.tag == "/b":
-                weight = "normal"
-
-        self.max_height = cursor_y
+        self.max_height = self.cursor_y
         self.scrollbar_height = scrollbar_height(self.max_height, self.height)
-        self.tree = display_list
 
 
